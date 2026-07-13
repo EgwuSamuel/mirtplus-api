@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.DS_Store
+Thumbs.db
+*.log
+kbs_results_raw.csv
+kbs_timings.csv
+kbs_medical_gmean.csv
+mirtplus_results_raw.csv
