@@ -2,8 +2,9 @@
 KBS Experiment — Final Run (no shuttle, incremental saves)
 """
 import sys, os
-sys.stdout.reconfigure(encoding='utf-8')
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+try: sys.stdout.reconfigure(encoding='utf-8')
+except AttributeError: pass
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 _DIR = os.path.dirname(os.path.abspath(__file__))
 # KBS_OUTPUT_DIR env var lets Colab (or any remote env) redirect results to Drive
 _OUTPUT_DIR = os.environ.get('KBS_OUTPUT_DIR', os.path.join(_DIR, 'results'))
@@ -216,81 +217,95 @@ class ProWSyn:
 #  DATASETS (no shuttle)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-U = r'dataset/dataset/used'
-D2 = r'dataset/dataset'
-
 def _filter(X, y, min_count=12):
     vc = pd.Series(y).value_counts()
     keep = vc[vc >= min_count].index
     m = np.isin(y, keep)
     return X[m], y[m]
 
+def _oml(data_id=None, name=None, version=1):
+    """Fetch from OpenML, numeric features only, cached."""
+    kw = dict(as_frame=True, parser='auto')
+    if data_id:
+        return fetch_openml(data_id=data_id, **kw)
+    return fetch_openml(name=name, version=version, **kw)
+
 def load_nt():
-    f = ['T3Resin','T4','T3','TSH','MaxTSH']
-    d = pd.read_csv(f'{U}/new-thyroid.data', header=None, names=['Class']+f)
-    return d[f].values.astype(float), d['Class'].values.astype(int)
+    d = _oml(data_id=40)          # new-thyroid
+    return d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_hr():
-    f = ['f1','f2','f3','f4']
-    d = pd.read_csv(f'{U}/hayes-roth.data', header=None, names=['id']+f+['Class'])
-    return d[f].values.astype(float), d['Class'].values.astype(int)
+    try:
+        d = _oml(data_id=9960)
+    except Exception:
+        d = fetch_openml(name='hayes-roth', version=1, as_frame=True, parser='auto')
+    df = d.data.copy()
+    # Encode any categorical/object columns (hayes-roth has text attributes)
+    for col in df.columns:
+        if df[col].dtype == object or hasattr(df[col], 'cat'):
+            df[col] = LabelEncoder().fit_transform(df[col].astype(str))
+    return df.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_bs():
-    f = ['LW','LD','RW','RD']
-    d = pd.read_csv(f'{U}/balance-scale.data', header=None, names=['Class']+f)
-    d['Class'] = d['Class'].map({'B':1,'L':2,'R':3})
-    return d[f].values.astype(float), d['Class'].values.astype(int)
+    d = _oml(data_id=11)          # balance-scale
+    return d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_ca():
-    f = ['buying','maint','doors','persons','lug_boot','safety']
-    d = pd.read_csv(f'{U}/car.data', header=None, names=f+['Class'])
-    ords = {'buying':['low','med','high','vhigh'],'maint':['low','med','high','vhigh'],
-            'doors':['2','3','4','5more'],'persons':['2','4','more'],
-            'lug_boot':['small','med','big'],'safety':['low','med','high']}
-    for c,o in ords.items(): d[c] = d[c].map({v:i for i,v in enumerate(o)})
-    d['Class'] = LabelEncoder().fit_transform(d['Class'])
-    return d[f].values.astype(float), d['Class'].values.astype(int)
+    d = _oml(data_id=21)          # car
+    return pd.get_dummies(d.data).values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_cmc():
-    f = ['age','wedu','hedu','child','wrel','wwork','hocc','sol','media']
-    d = pd.read_csv(f'{U}/cmc.data', sep='\t', header=None, names=['id']+f+['Class'])
-    return d[f].values.astype(float), d['Class'].values.astype(int)
+    d = _oml(data_id=23)          # cmc
+    X = d.data.select_dtypes(include=[np.number]).values.astype(float)
+    return X, LabelEncoder().fit_transform(d.target)
 
 def load_ecoli():
-    d = pd.read_csv(f'{D2}/new_to_use/ecoli.data', header=None, sep=r'\s+')
-    X = d.iloc[:,1:-1].values.astype(float)
-    y = LabelEncoder().fit_transform(d.iloc[:,-1])
+    d = _oml(data_id=39)          # ecoli
+    X, y = d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
     return _filter(X, y)
 
 def load_glass():
-    d = pd.read_csv('Implementation/Implementation/glass.data', header=None)
-    X = d.iloc[:,1:-1].values.astype(float)
-    y = d.iloc[:,-1].values.astype(int)
+    d = _oml(data_id=41)          # glass
+    X, y = d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
     return _filter(X, y)
 
 def load_wine():
-    d = pd.read_csv(f'{D2}/wine.data', header=None)
-    return d.iloc[:,1:].values.astype(float), d.iloc[:,0].values.astype(int)
+    d = _oml(data_id=187)         # wine-recognition
+    return d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_dermatology():
-    d = pd.read_csv(f'{D2}/dermatology.data', header=None, na_values='?')
-    d = d.fillna(d.median(numeric_only=True))
-    return _filter(d.iloc[:,:-1].values.astype(float), d.iloc[:,-1].values.astype(int))
+    d = _oml(data_id=35)          # dermatology
+    df = d.data.apply(pd.to_numeric, errors='coerce').fillna(0)
+    X, y = df.values.astype(float), LabelEncoder().fit_transform(d.target)
+    return _filter(X, y)
 
 def load_yeast():
-    d = pd.read_csv(f'{D2}/yeast.data', header=None, sep=r'\s+')
-    X = d.iloc[:,1:-1].values.astype(float)
-    y = LabelEncoder().fit_transform(d.iloc[:,-1])
+    d = _oml(data_id=181)         # yeast
+    X, y = d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
     return _filter(X, y)
 
 def load_wqred():
-    d = pd.read_csv(f'{D2}/winequality-red.csv', sep=';')
-    return _filter(d.iloc[:,:-1].values.astype(float), d.iloc[:,-1].values.astype(int))
+    d = _oml(data_id=40691)       # wine-quality-red
+    X, y = d.data.values.astype(float), LabelEncoder().fit_transform(d.target)
+    return _filter(X, y)
 
 def load_cleveland():
-    d = pd.read_csv(f'{D2}/processed.cleveland.data', header=None, na_values='?')
-    d = d.dropna()
-    return d.iloc[:,:-1].values.astype(float), d.iloc[:,-1].values.astype(int)
+    # data_id=31 is heart-c (binary). Try 179 for the 5-class version first.
+    for did in [179, 1565, 1027]:
+        try:
+            d = fetch_openml(data_id=did, as_frame=True, parser='auto')
+            df = d.data.apply(pd.to_numeric, errors='coerce')
+            df = df.fillna(df.median(numeric_only=True))
+            y = LabelEncoder().fit_transform(d.target)
+            if len(np.unique(y)) >= 3:
+                return _filter(df.values.astype(float), y)
+        except Exception:
+            continue
+    # Fallback: binary heart-c from data_id=31
+    d = _oml(data_id=31)
+    df = d.data.apply(pd.to_numeric, errors='coerce')
+    df = df.fillna(df.median(numeric_only=True))
+    return df.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_vehicle():
     d = fetch_openml(name='vehicle', version=1, as_frame=True, parser='auto')
@@ -327,13 +342,23 @@ def load_thyroid_ann():
     return _filter(d.data.values.astype(float), LabelEncoder().fit_transform(d.target))
 
 def load_wqwhite():
-    d = pd.read_csv(f'{D2}/winequality-white.csv', sep=';')
-    return _filter(d.iloc[:,:-1].values.astype(float), d.iloc[:,-1].values.astype(int))
+    # data_id=40590 returns a wrong multi-column target; fetch the canonical set by name.
+    try:
+        d = fetch_openml(name='wine-quality-white', version=1, as_frame=True, parser='auto')
+    except Exception:
+        d = fetch_openml(data_id=40498, as_frame=True, parser='auto')
+    tgt = d.target
+    if getattr(tgt, 'ndim', 1) > 1:          # squeeze accidental 2D target
+        tgt = tgt.iloc[:, 0]
+    y = LabelEncoder().fit_transform(np.asarray(tgt).ravel())
+    X = d.data.apply(pd.to_numeric, errors='coerce').fillna(0).values.astype(float)
+    return _filter(X, y)
 
 def load_hepatitis():
-    d = pd.read_csv(f'{D2}/hepatitis.data', header=None, na_values='?')
-    d = d.dropna()
-    return d.iloc[:,1:].values.astype(float), d.iloc[:,0].values.astype(int)
+    d = _oml(data_id=55)          # hepatitis
+    df = d.data.apply(pd.to_numeric, errors='coerce')
+    df = df.fillna(df.median(numeric_only=True)).fillna(0)  # cover all-NaN columns too
+    return df.values.astype(float), LabelEncoder().fit_transform(d.target)
 
 def load_splice():
     d = fetch_openml(name='splice', version=1, as_frame=True, parser='auto')
@@ -431,6 +456,7 @@ if __name__ == '__main__':
             continue
         try:
             X, y = loader()
+            X = np.nan_to_num(np.asarray(X, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
             loaded[name] = (X, y)
             classes = np.unique(y)
             counts = pd.Series(y).value_counts()

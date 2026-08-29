@@ -1,0 +1,11 @@
+,W,p (MIRT++ > x),sig
+None,119920.0,0.0,***
+SMOTE,75150.0,0.148,n.s.
+Borderline-SMOTE,87480.0,0.004,**
+ADASYN,97529.0,0.0,***
+SMOTE-ENN,158176.0,0.0,***
+SMOTE-Tomek,89810.0,0.0131,*
+KMeans-SMOTE,100752.0,0.0,***
+Safe-Level-SMOTE,89354.0,0.0,***
+MWMOTE,92304.0,0.0,***
+ProWSyn,77564.0,0.0503,n.s.
