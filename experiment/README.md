@@ -1,9 +1,9 @@
-# MIRT++ — Experiment & Reproducibility Package
+# MIRT — Experiment & Reproducibility Package
 
 Code, benchmark data references, result tables, and figures for the manuscript
-**"MIRT++: A Similarity-Modulated, Difficulty-Aware Resampling Technique for
-Multiclass Imbalanced Classification"** (submitted to *Knowledge-Based Systems*,
-ms. KNOSYS-D-26-20302).
+**"MIRT: A Similarity-Modulated, Difficulty-Aware Resampling Technique for
+Multiclass Imbalanced Classification"** (preliminary evaluation; the scripts of the
+current, corrected benchmark are described in the top-level README).
 
 MIRT++ (`mirtplus.py`) is an `imbalanced-learn`-style resampler:
 
